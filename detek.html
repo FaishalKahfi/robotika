@@ -1,0 +1,533 @@
+<!DOCTYPE html>
+<html lang="id">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Object Detection Real-Time - TensorFlow.js</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.11.0"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd@2.2.3"></script>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        padding: 20px;
+        color: #fff;
+      }
+
+      .header {
+        text-align: center;
+        margin-bottom: 30px;
+      }
+
+      .header h1 {
+        font-size: 2.5em;
+        margin-bottom: 10px;
+        text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+      }
+
+      .header p {
+        font-size: 1.1em;
+        opacity: 0.9;
+      }
+
+      .container {
+        background: rgba(255, 255, 255, 0.95);
+        border-radius: 20px;
+        padding: 30px;
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        max-width: 900px;
+        width: 100%;
+      }
+
+      .video-container {
+        position: relative;
+        width: 100%;
+        max-width: 640px;
+        margin: 0 auto 20px;
+        border-radius: 15px;
+        overflow: hidden;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+      }
+
+      #webcam {
+        width: 100%;
+        height: auto;
+        display: block;
+      }
+
+      #canvas {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+      }
+
+      .controls {
+        display: flex;
+        justify-content: center;
+        gap: 15px;
+        margin-bottom: 20px;
+        flex-wrap: wrap;
+      }
+
+      button {
+        padding: 12px 30px;
+        font-size: 1em;
+        font-weight: bold;
+        border: none;
+        border-radius: 25px;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+      }
+
+      #startBtn {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+      }
+
+      #startBtn:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+      }
+
+      #startBtn:disabled {
+        background: #ccc;
+        cursor: not-allowed;
+        transform: none;
+      }
+
+      #stopBtn {
+        background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+        color: white;
+      }
+
+      #stopBtn:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+      }
+
+      #stopBtn:disabled {
+        background: #ccc;
+        cursor: not-allowed;
+        transform: none;
+      }
+
+      .status {
+        text-align: center;
+        padding: 15px;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border-radius: 10px;
+        margin-bottom: 20px;
+        font-weight: bold;
+        min-height: 50px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      .stats {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 15px;
+        margin-top: 20px;
+      }
+
+      .stat-card {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 20px;
+        border-radius: 10px;
+        text-align: center;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+      }
+
+      .stat-card h3 {
+        font-size: 0.9em;
+        margin-bottom: 10px;
+        opacity: 0.9;
+      }
+
+      .stat-card .value {
+        font-size: 2em;
+        font-weight: bold;
+      }
+
+      .detection-list {
+        max-height: 200px;
+        overflow-y: auto;
+        background: #f8f9fa;
+        border-radius: 10px;
+        padding: 15px;
+        margin-top: 20px;
+      }
+
+      .detection-item {
+        background: white;
+        padding: 10px;
+        margin-bottom: 10px;
+        border-radius: 8px;
+        border-left: 4px solid #667eea;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+      }
+
+      .detection-item:last-child {
+        margin-bottom: 0;
+      }
+
+      .detection-label {
+        font-weight: bold;
+        color: #667eea;
+        text-transform: capitalize;
+      }
+
+      .detection-confidence {
+        background: #667eea;
+        color: white;
+        padding: 4px 12px;
+        border-radius: 15px;
+        font-size: 0.9em;
+      }
+
+      .loader {
+        border: 4px solid #f3f3f3;
+        border-top: 4px solid #667eea;
+        border-radius: 50%;
+        width: 40px;
+        height: 40px;
+        animation: spin 1s linear infinite;
+        margin: 0 auto;
+      }
+
+      @keyframes spin {
+        0% {
+          transform: rotate(0deg);
+        }
+        100% {
+          transform: rotate(360deg);
+        }
+      }
+
+      .footer {
+        margin-top: 20px;
+        text-align: center;
+        opacity: 0.8;
+        font-size: 0.9em;
+      }
+
+      @media (max-width: 768px) {
+        .header h1 {
+          font-size: 1.8em;
+        }
+
+        .container {
+          padding: 20px;
+        }
+
+        button {
+          padding: 10px 20px;
+          font-size: 0.9em;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="header">
+      <h1>🎯 Object Detection Real-Time</h1>
+      <p>Deteksi objek menggunakan TensorFlow.js & COCO-SSD</p>
+    </div>
+
+    <div class="container">
+      <div class="status" id="status">
+        <div class="loader"></div>
+        <span style="margin-left: 15px">Memuat model TensorFlow.js...</span>
+      </div>
+
+      <div class="controls">
+        <button id="startBtn" disabled>▶ Mulai Deteksi</button>
+        <button id="stopBtn" disabled>⏸ Berhenti</button>
+      </div>
+
+      <div class="video-container">
+        <video id="webcam" autoplay playsinline></video>
+        <canvas id="canvas"></canvas>
+      </div>
+
+      <div class="stats">
+        <div class="stat-card">
+          <h3>Objek Terdeteksi</h3>
+          <div class="value" id="objectCount">0</div>
+        </div>
+        <div class="stat-card">
+          <h3>FPS</h3>
+          <div class="value" id="fps">0</div>
+        </div>
+        <div class="stat-card">
+          <h3>Waktu Proses (ms)</h3>
+          <div class="value" id="processTime">0</div>
+        </div>
+      </div>
+
+      <div class="detection-list" id="detectionList">
+        <p style="text-align: center; color: #999">
+          Belum ada objek terdeteksi
+        </p>
+      </div>
+    </div>
+
+    <div class="footer">
+      <p>Powered by TensorFlow.js COCO-SSD Model</p>
+    </div>
+
+    <script>
+      let model = null;
+      let webcam = null;
+      let canvas = null;
+      let ctx = null;
+      let isDetecting = false;
+      let animationId = null;
+      let lastFrameTime = Date.now();
+      let frameCount = 0;
+      let fpsInterval = null;
+
+      const startBtn = document.getElementById("startBtn");
+      const stopBtn = document.getElementById("stopBtn");
+      const status = document.getElementById("status");
+      const objectCountEl = document.getElementById("objectCount");
+      const fpsEl = document.getElementById("fps");
+      const processTimeEl = document.getElementById("processTime");
+      const detectionListEl = document.getElementById("detectionList");
+
+      // Inisialisasi
+      async function init() {
+        try {
+          updateStatus("Memuat model COCO-SSD...");
+          model = await cocoSsd.load();
+
+          webcam = document.getElementById("webcam");
+          canvas = document.getElementById("canvas");
+          ctx = canvas.getContext("2d");
+
+          updateStatus(
+            'Model siap! Klik tombol "Mulai Deteksi" untuk memulai.'
+          );
+          startBtn.disabled = false;
+        } catch (error) {
+          updateStatus("Error: " + error.message);
+          console.error("Error loading model:", error);
+        }
+      }
+
+      // Update status
+      function updateStatus(message) {
+        status.innerHTML = message;
+      }
+
+      // Mulai webcam
+      async function startWebcam() {
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({
+            video: {
+              width: { ideal: 640 },
+              height: { ideal: 480 },
+            },
+          });
+          webcam.srcObject = stream;
+
+          return new Promise((resolve) => {
+            webcam.onloadedmetadata = () => {
+              canvas.width = webcam.videoWidth;
+              canvas.height = webcam.videoHeight;
+              resolve();
+            };
+          });
+        } catch (error) {
+          updateStatus("Error mengakses webcam: " + error.message);
+          throw error;
+        }
+      }
+
+      // Stop webcam
+      function stopWebcam() {
+        if (webcam && webcam.srcObject) {
+          webcam.srcObject.getTracks().forEach((track) => track.stop());
+          webcam.srcObject = null;
+        }
+      }
+
+      // Gambar bounding box
+      function drawBoundingBox(prediction) {
+        const [x, y, width, height] = prediction.bbox;
+
+        // Gambar box
+        ctx.strokeStyle = "#00FF00";
+        ctx.lineWidth = 3;
+        ctx.strokeRect(x, y, width, height);
+
+        // Background untuk label
+        const label = `${prediction.class} ${Math.round(
+          prediction.score * 100
+        )}%`;
+        ctx.font = "bold 16px Arial";
+        const textWidth = ctx.measureText(label).width;
+
+        ctx.fillStyle = "#00FF00";
+        ctx.fillRect(x, y - 25, textWidth + 10, 25);
+
+        // Text label
+        ctx.fillStyle = "#000000";
+        ctx.fillText(label, x + 5, y - 7);
+      }
+
+      // Update daftar deteksi
+      function updateDetectionList(predictions) {
+        if (predictions.length === 0) {
+          detectionListEl.innerHTML =
+            '<p style="text-align: center; color: #999;">Belum ada objek terdeteksi</p>';
+          return;
+        }
+
+        detectionListEl.innerHTML = predictions
+          .map(
+            (pred) => `
+                <div class="detection-item">
+                    <span class="detection-label">${pred.class}</span>
+                    <span class="detection-confidence">${Math.round(
+                      pred.score * 100
+                    )}%</span>
+                </div>
+            `
+          )
+          .join("");
+      }
+
+      // Deteksi objek
+      async function detectObjects() {
+        if (!isDetecting) return;
+
+        const startTime = performance.now();
+
+        try {
+          const predictions = await model.detect(webcam);
+
+          // Clear canvas
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+          // Gambar setiap deteksi
+          predictions.forEach((prediction) => {
+            drawBoundingBox(prediction);
+          });
+
+          // Update stats
+          objectCountEl.textContent = predictions.length;
+          const processTime = Math.round(performance.now() - startTime);
+          processTimeEl.textContent = processTime;
+
+          // Update detection list
+          updateDetectionList(predictions);
+
+          // Calculate FPS
+          frameCount++;
+        } catch (error) {
+          console.error("Error during detection:", error);
+        }
+
+        animationId = requestAnimationFrame(detectObjects);
+      }
+
+      // Update FPS
+      function updateFPS() {
+        fpsEl.textContent = frameCount;
+        frameCount = 0;
+      }
+
+      // Mulai deteksi
+      async function startDetection() {
+        try {
+          startBtn.disabled = true;
+          updateStatus("Memulai webcam...");
+
+          await startWebcam();
+
+          isDetecting = true;
+          startBtn.disabled = true;
+          stopBtn.disabled = false;
+
+          updateStatus("🟢 Deteksi aktif - webcam berjalan");
+
+          // Start FPS counter
+          fpsInterval = setInterval(updateFPS, 1000);
+
+          detectObjects();
+        } catch (error) {
+          startBtn.disabled = false;
+          console.error("Error starting detection:", error);
+        }
+      }
+
+      // Stop deteksi
+      function stopDetection() {
+        isDetecting = false;
+
+        if (animationId) {
+          cancelAnimationFrame(animationId);
+          animationId = null;
+        }
+
+        if (fpsInterval) {
+          clearInterval(fpsInterval);
+          fpsInterval = null;
+        }
+
+        stopWebcam();
+
+        // Clear canvas
+        if (ctx) {
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+        }
+
+        startBtn.disabled = false;
+        stopBtn.disabled = true;
+
+        updateStatus(
+          '⏸ Deteksi dihentikan. Klik "Mulai Deteksi" untuk memulai lagi.'
+        );
+
+        // Reset stats
+        objectCountEl.textContent = "0";
+        fpsEl.textContent = "0";
+        processTimeEl.textContent = "0";
+        frameCount = 0;
+      }
+
+      // Event listeners
+      startBtn.addEventListener("click", startDetection);
+      stopBtn.addEventListener("click", stopDetection);
+
+      // Inisialisasi saat halaman dimuat
+      window.addEventListener("load", init);
+
+      // Cleanup saat halaman ditutup
+      window.addEventListener("beforeunload", () => {
+        if (isDetecting) {
+          stopDetection();
+        }
+      });
+    </script>
+  </body>
+</html>
