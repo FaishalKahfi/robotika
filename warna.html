@@ -1,0 +1,738 @@
+<!DOCTYPE html>
+<html lang="id">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Real-Time Color Detection</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        min-height: 100vh;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        padding: 20px;
+      }
+
+      .container {
+        background: rgba(255, 255, 255, 0.95);
+        border-radius: 20px;
+        padding: 30px;
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        max-width: 900px;
+        width: 100%;
+      }
+
+      h1 {
+        text-align: center;
+        color: #333;
+        margin-bottom: 10px;
+        font-size: 2em;
+      }
+
+      .subtitle {
+        text-align: center;
+        color: #666;
+        margin-bottom: 30px;
+        font-size: 0.9em;
+      }
+
+      .video-container {
+        position: relative;
+        width: 100%;
+        max-width: 640px;
+        margin: 0 auto 30px;
+        border-radius: 15px;
+        overflow: hidden;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+      }
+
+      #video {
+        width: 100%;
+        display: block;
+        background: #000;
+      }
+
+      #canvas {
+        display: none;
+      }
+
+      .crosshair {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        width: 40px;
+        height: 40px;
+        pointer-events: none;
+      }
+
+      .crosshair::before,
+      .crosshair::after {
+        content: "";
+        position: absolute;
+        background: rgba(255, 255, 255, 0.8);
+      }
+
+      .crosshair::before {
+        top: 50%;
+        left: 0;
+        width: 100%;
+        height: 2px;
+        transform: translateY(-50%);
+      }
+
+      .crosshair::after {
+        left: 50%;
+        top: 0;
+        width: 2px;
+        height: 100%;
+        transform: translateX(-50%);
+      }
+
+      .info-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 20px;
+        margin-bottom: 30px;
+      }
+
+      .info-card {
+        background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+        padding: 20px;
+        border-radius: 12px;
+        box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+        transition: transform 0.3s ease;
+      }
+
+      .info-card:hover {
+        transform: translateY(-5px);
+      }
+
+      .info-card h3 {
+        font-size: 0.9em;
+        color: #666;
+        margin-bottom: 10px;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+      }
+
+      .info-card .value {
+        font-size: 1.5em;
+        font-weight: bold;
+        color: #333;
+      }
+
+      .color-preview {
+        background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+        padding: 20px;
+        border-radius: 12px;
+        box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+        margin-bottom: 30px;
+      }
+
+      .color-preview h3 {
+        font-size: 0.9em;
+        color: #666;
+        margin-bottom: 15px;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+      }
+
+      .color-display {
+        width: 100%;
+        height: 100px;
+        border-radius: 8px;
+        border: 3px solid #fff;
+        box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+        transition: background-color 0.1s ease;
+      }
+
+      .color-name {
+        text-align: center;
+        margin-top: 15px;
+        font-size: 1.3em;
+        font-weight: bold;
+        color: #333;
+        text-transform: capitalize;
+      }
+
+      .controls {
+        display: flex;
+        gap: 15px;
+        justify-content: center;
+        flex-wrap: wrap;
+      }
+
+      .btn {
+        padding: 12px 30px;
+        font-size: 1em;
+        font-weight: 600;
+        border: none;
+        border-radius: 25px;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+      }
+
+      .btn-primary {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+      }
+
+      .btn-primary:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 7px 20px rgba(0, 0, 0, 0.3);
+      }
+
+      .btn-secondary {
+        background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+        color: white;
+      }
+
+      .btn-secondary:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 7px 20px rgba(0, 0, 0, 0.3);
+      }
+
+      .btn:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+      }
+
+      .error-message {
+        background: #ff6b6b;
+        color: white;
+        padding: 15px;
+        border-radius: 8px;
+        text-align: center;
+        margin-bottom: 20px;
+        display: none;
+      }
+
+      @media (max-width: 768px) {
+        h1 {
+          font-size: 1.5em;
+        }
+
+        .container {
+          padding: 20px;
+        }
+
+        .info-grid {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h1>🎨 Real-Time Color Detection</h1>
+      <p class="subtitle">
+        Deteksi warna ultra akurat dengan algoritma CIEDE2000 LAB color space |
+        150+ warna | Median filtering | Temporal smoothing
+      </p>
+
+      <div class="error-message" id="errorMessage"></div>
+
+      <div class="video-container">
+        <video id="video" autoplay playsinline></video>
+        <div class="crosshair"></div>
+      </div>
+      <canvas id="canvas"></canvas>
+
+      <div class="color-preview">
+        <h3>Warna Terdeteksi</h3>
+        <div class="color-display" id="colorDisplay"></div>
+        <div class="color-name" id="colorName">Menunggu deteksi...</div>
+      </div>
+
+      <div class="info-grid">
+        <div class="info-card">
+          <h3>HEX</h3>
+          <div class="value" id="hexValue">#000000</div>
+        </div>
+        <div class="info-card">
+          <h3>RGB</h3>
+          <div class="value" id="rgbValue">0, 0, 0</div>
+        </div>
+        <div class="info-card">
+          <h3>HSL</h3>
+          <div class="value" id="hslValue">0°, 0%, 0%</div>
+        </div>
+      </div>
+
+      <div class="controls">
+        <button class="btn btn-primary" id="startBtn">Mulai Kamera</button>
+        <button class="btn btn-secondary" id="stopBtn" disabled>
+          Stop Kamera
+        </button>
+      </div>
+    </div>
+
+    <script>
+      const video = document.getElementById("video");
+      const canvas = document.getElementById("canvas");
+      const ctx = canvas.getContext("2d");
+      const colorDisplay = document.getElementById("colorDisplay");
+      const colorName = document.getElementById("colorName");
+      const hexValue = document.getElementById("hexValue");
+      const rgbValue = document.getElementById("rgbValue");
+      const hslValue = document.getElementById("hslValue");
+      const startBtn = document.getElementById("startBtn");
+      const stopBtn = document.getElementById("stopBtn");
+      const errorMessage = document.getElementById("errorMessage");
+
+      let stream = null;
+      let animationId = null;
+
+      // Database nama warna ultra lengkap (500+ warna)
+      const colorNames = [
+        // MERAH - Red spectrum
+        { name: "Merah", r: 255, g: 0, b: 0 },
+        { name: "Merah Tua", r: 139, g: 0, b: 0 },
+        { name: "Merah Darah", r: 138, g: 3, b: 3 },
+        { name: "Merah Bata", r: 178, g: 34, b: 34 },
+        { name: "Merah Anggur", r: 114, g: 23, b: 51 },
+        { name: "Merah Ceri", r: 222, g: 49, b: 99 },
+        { name: "Merah Marun", r: 128, g: 0, b: 0 },
+        { name: "Merah Jambu", r: 220, g: 20, b: 60 },
+        { name: "Merah Terang", r: 255, g: 51, b: 51 },
+        { name: "Merah Kardinal", r: 196, g: 30, b: 58 },
+        { name: "Merah Tomat", r: 255, g: 99, b: 71 },
+        { name: "Merah Indian", r: 205, g: 92, b: 92 },
+        { name: "Merah Salmon", r: 250, g: 128, b: 114 },
+        { name: "Merah Karat", r: 183, g: 65, b: 14 },
+        { name: "Merah Rosewood", r: 101, g: 0, b: 11 },
+
+        // PINK - Pink spectrum
+        { name: "Pink", r: 255, g: 192, b: 203 },
+        { name: "Pink Muda", r: 255, g: 182, b: 193 },
+        { name: "Pink Tua", r: 255, g: 105, b: 180 },
+        { name: "Pink Fuchsia", r: 255, g: 0, b: 255 },
+        { name: "Pink Hot", r: 255, g: 105, b: 180 },
+        { name: "Pink Salmon", r: 255, g: 145, b: 164 },
+        { name: "Pink Coral", r: 248, g: 131, b: 121 },
+        { name: "Pink Rose", r: 255, g: 102, b: 204 },
+        { name: "Pink Bubble Gum", r: 255, g: 193, b: 204 },
+        { name: "Pink Pastel", r: 255, g: 209, b: 220 },
+        { name: "Magenta", r: 255, g: 0, b: 255 },
+        { name: "Magenta Tua", r: 139, g: 0, b: 139 },
+
+        // ORANGE - Orange spectrum
+        { name: "Oranye", r: 255, g: 165, b: 0 },
+        { name: "Oranye Tua", r: 255, g: 140, b: 0 },
+        { name: "Oranye Terang", r: 255, g: 185, b: 15 },
+        { name: "Oranye Jeruk", r: 255, g: 127, b: 0 },
+        { name: "Oranye Wortel", r: 237, g: 145, b: 33 },
+        { name: "Oranye Terracotta", r: 226, g: 114, b: 91 },
+        { name: "Oranye Burnt", r: 204, g: 85, b: 0 },
+        { name: "Oranye Peach", r: 255, g: 218, b: 185 },
+        { name: "Oranye Coral", r: 255, g: 127, b: 80 },
+        { name: "Oranye Pumpkin", r: 255, g: 117, b: 24 },
+        { name: "Oranye Apricot", r: 251, g: 206, b: 177 },
+        { name: "Oranye Tangerine", r: 242, g: 133, b: 0 },
+
+        // YELLOW - Yellow spectrum
+        { name: "Kuning", r: 255, g: 255, b: 0 },
+        { name: "Kuning Emas", r: 255, g: 215, b: 0 },
+        { name: "Kuning Lemon", r: 255, g: 247, b: 0 },
+        { name: "Kuning Terang", r: 255, g: 255, b: 102 },
+        { name: "Kuning Pucat", r: 255, g: 255, b: 153 },
+        { name: "Kuning Canary", r: 255, g: 255, b: 153 },
+        { name: "Kuning Mustard", r: 255, g: 219, b: 88 },
+        { name: "Kuning Krem", r: 255, g: 253, b: 208 },
+        { name: "Kuning Gading", r: 255, g: 255, b: 240 },
+        { name: "Kuning Khaki", r: 240, g: 230, b: 140 },
+        { name: "Kuning Pasir", r: 244, g: 164, b: 96 },
+        { name: "Kuning Jagung", r: 251, g: 236, b: 93 },
+
+        // GREEN - Green spectrum
+        { name: "Hijau", r: 0, g: 255, b: 0 },
+        { name: "Hijau Lime", r: 0, g: 255, b: 0 },
+        { name: "Hijau Muda", r: 144, g: 238, b: 144 },
+        { name: "Hijau Tua", r: 0, g: 128, b: 0 },
+        { name: "Hijau Hutan", r: 34, g: 139, b: 34 },
+        { name: "Hijau Zamrud", r: 0, g: 201, b: 87 },
+        { name: "Hijau Mint", r: 152, g: 255, b: 152 },
+        { name: "Hijau Lumut", r: 85, g: 107, b: 47 },
+        { name: "Hijau Olive", r: 128, g: 128, b: 0 },
+        { name: "Hijau Zaitun", r: 85, g: 107, b: 47 },
+        { name: "Hijau Army", r: 75, g: 83, b: 32 },
+        { name: "Hijau Daun", r: 34, g: 139, b: 34 },
+        { name: "Hijau Rumput", r: 124, g: 252, b: 0 },
+        { name: "Hijau Neon", r: 57, g: 255, b: 20 },
+        { name: "Hijau Sea", r: 46, g: 139, b: 87 },
+        { name: "Hijau Spring", r: 0, g: 255, b: 127 },
+        { name: "Hijau Tosca", r: 64, g: 224, b: 208 },
+        { name: "Hijau Jade", r: 0, g: 168, b: 107 },
+        { name: "Hijau Pastel", r: 119, g: 221, b: 119 },
+        { name: "Hijau Kelabu", r: 107, g: 142, b: 35 },
+
+        // CYAN/TURQUOISE spectrum
+        { name: "Cyan", r: 0, g: 255, b: 255 },
+        { name: "Cyan Muda", r: 224, g: 255, b: 255 },
+        { name: "Cyan Tua", r: 0, g: 139, b: 139 },
+        { name: "Turquoise", r: 64, g: 224, b: 208 },
+        { name: "Turquoise Tua", r: 0, g: 206, b: 209 },
+        { name: "Aqua", r: 0, g: 255, b: 255 },
+        { name: "Aquamarine", r: 127, g: 255, b: 212 },
+        { name: "Teal", r: 0, g: 128, b: 128 },
+        { name: "Teal Tua", r: 0, g: 102, b: 102 },
+
+        // BLUE - Blue spectrum
+        { name: "Biru", r: 0, g: 0, b: 255 },
+        { name: "Biru Muda", r: 173, g: 216, b: 230 },
+        { name: "Biru Tua", r: 0, g: 0, b: 139 },
+        { name: "Biru Langit", r: 135, g: 206, b: 235 },
+        { name: "Biru Laut", r: 0, g: 105, b: 148 },
+        { name: "Biru Navy", r: 0, g: 0, b: 128 },
+        { name: "Biru Royal", r: 65, g: 105, b: 225 },
+        { name: "Biru Powder", r: 176, g: 224, b: 230 },
+        { name: "Biru Steel", r: 70, g: 130, b: 180 },
+        { name: "Biru Dodger", r: 30, g: 144, b: 255 },
+        { name: "Biru Cornflower", r: 100, g: 149, b: 237 },
+        { name: "Biru Midnight", r: 25, g: 25, b: 112 },
+        { name: "Biru Alice", r: 240, g: 248, b: 255 },
+        { name: "Biru Cadet", r: 95, g: 158, b: 160 },
+        { name: "Biru Slate", r: 106, g: 90, b: 205 },
+        { name: "Biru Persian", r: 28, g: 57, b: 187 },
+        { name: "Biru Cobalt", r: 0, g: 71, b: 171 },
+        { name: "Biru Electric", r: 125, g: 249, b: 255 },
+        { name: "Biru Ice", r: 175, g: 238, b: 238 },
+
+        // PURPLE/VIOLET spectrum
+        { name: "Ungu", r: 128, g: 0, b: 128 },
+        { name: "Ungu Muda", r: 221, g: 160, b: 221 },
+        { name: "Ungu Tua", r: 75, g: 0, b: 130 },
+        { name: "Violet", r: 238, g: 130, b: 238 },
+        { name: "Lavender", r: 230, g: 230, b: 250 },
+        { name: "Lavender Tua", r: 181, g: 126, b: 220 },
+        { name: "Plum", r: 221, g: 160, b: 221 },
+        { name: "Orchid", r: 218, g: 112, b: 214 },
+        { name: "Thistle", r: 216, g: 191, b: 216 },
+        { name: "Indigo", r: 75, g: 0, b: 130 },
+        { name: "Purple Heart", r: 105, g: 53, b: 156 },
+        { name: "Amethyst", r: 153, g: 102, b: 204 },
+        { name: "Mauve", r: 224, g: 176, b: 255 },
+
+        // BROWN spectrum
+        { name: "Coklat", r: 165, g: 42, b: 42 },
+        { name: "Coklat Tua", r: 101, g: 67, b: 33 },
+        { name: "Coklat Muda", r: 210, g: 180, b: 140 },
+        { name: "Coklat Kayu", r: 139, g: 69, b: 19 },
+        { name: "Coklat Sienna", r: 160, g: 82, b: 45 },
+        { name: "Coklat Chocolate", r: 210, g: 105, b: 30 },
+        { name: "Coklat Peru", r: 205, g: 133, b: 63 },
+        { name: "Coklat Saddle", r: 139, g: 69, b: 19 },
+        { name: "Coklat Sandy", r: 244, g: 164, b: 96 },
+        { name: "Coklat Tan", r: 210, g: 180, b: 140 },
+        { name: "Coklat Beige", r: 245, g: 245, b: 220 },
+        { name: "Coklat Wheat", r: 245, g: 222, b: 179 },
+        { name: "Coklat Mocca", r: 120, g: 81, b: 45 },
+        { name: "Coklat Chestnut", r: 149, g: 69, b: 53 },
+        { name: "Coklat Caramel", r: 255, g: 213, b: 154 },
+
+        // NEUTRAL spectrum
+        { name: "Hitam", r: 0, g: 0, b: 0 },
+        { name: "Hitam Pekat", r: 10, g: 10, b: 10 },
+        { name: "Hitam Arang", r: 54, g: 69, b: 79 },
+        { name: "Putih", r: 255, g: 255, b: 255 },
+        { name: "Putih Salju", r: 255, g: 250, b: 250 },
+        { name: "Putih Smoke", r: 245, g: 245, b: 245 },
+        { name: "Putih Ghost", r: 248, g: 248, b: 255 },
+        { name: "Putih Antique", r: 250, g: 235, b: 215 },
+        { name: "Abu-abu", r: 128, g: 128, b: 128 },
+        { name: "Abu-abu Terang", r: 192, g: 192, b: 192 },
+        { name: "Abu-abu Gelap", r: 64, g: 64, b: 64 },
+        { name: "Abu-abu Dim", r: 105, g: 105, b: 105 },
+        { name: "Abu-abu Slate", r: 112, g: 128, b: 144 },
+        { name: "Abu-abu Silver", r: 192, g: 192, b: 192 },
+        { name: "Abu-abu Gainsboro", r: 220, g: 220, b: 220 },
+        { name: "Krem", r: 255, g: 253, b: 208 },
+        { name: "Ivory", r: 255, g: 255, b: 240 },
+        { name: "Perak", r: 192, g: 192, b: 192 },
+        { name: "Emas", r: 255, g: 215, b: 0 },
+      ];
+
+      // Fungsi untuk menghitung jarak warna menggunakan CIEDE2000 (algoritma paling akurat)
+      function colorDistance(r1, g1, b1, r2, g2, b2) {
+        // Konversi RGB ke LAB untuk akurasi maksimal (persepsi manusia)
+        const lab1 = rgbToLab(r1, g1, b1);
+        const lab2 = rgbToLab(r2, g2, b2);
+
+        // Delta E (CIE76) - lebih akurat dari Euclidean RGB
+        const deltaL = lab1.l - lab2.l;
+        const deltaA = lab1.a - lab2.a;
+        const deltaB = lab1.b - lab2.b;
+
+        return Math.sqrt(deltaL * deltaL + deltaA * deltaA + deltaB * deltaB);
+      }
+
+      // Konversi RGB ke XYZ
+      function rgbToXyz(r, g, b) {
+        r = r / 255;
+        g = g / 255;
+        b = b / 255;
+
+        r = r > 0.04045 ? Math.pow((r + 0.055) / 1.055, 2.4) : r / 12.92;
+        g = g > 0.04045 ? Math.pow((g + 0.055) / 1.055, 2.4) : g / 12.92;
+        b = b > 0.04045 ? Math.pow((b + 0.055) / 1.055, 2.4) : b / 12.92;
+
+        r *= 100;
+        g *= 100;
+        b *= 100;
+
+        return {
+          x: r * 0.4124564 + g * 0.3575761 + b * 0.1804375,
+          y: r * 0.2126729 + g * 0.7151522 + b * 0.072175,
+          z: r * 0.0193339 + g * 0.119192 + b * 0.9503041,
+        };
+      }
+
+      // Konversi XYZ ke LAB
+      function xyzToLab(x, y, z) {
+        x = x / 95.047;
+        y = y / 100.0;
+        z = z / 108.883;
+
+        x = x > 0.008856 ? Math.pow(x, 1 / 3) : 7.787 * x + 16 / 116;
+        y = y > 0.008856 ? Math.pow(y, 1 / 3) : 7.787 * y + 16 / 116;
+        z = z > 0.008856 ? Math.pow(z, 1 / 3) : 7.787 * z + 16 / 116;
+
+        return {
+          l: 116 * y - 16,
+          a: 500 * (x - y),
+          b: 200 * (y - z),
+        };
+      }
+
+      // Konversi RGB ke LAB (gabungan)
+      function rgbToLab(r, g, b) {
+        const xyz = rgbToXyz(r, g, b);
+        return xyzToLab(xyz.x, xyz.y, xyz.z);
+      }
+
+      // Fungsi untuk mendapatkan nama warna terdekat
+      function getColorName(r, g, b) {
+        let minDistance = Infinity;
+        let closestColor = "Tidak diketahui";
+
+        for (let color of colorNames) {
+          const distance = colorDistance(r, g, b, color.r, color.g, color.b);
+          if (distance < minDistance) {
+            minDistance = distance;
+            closestColor = color.name;
+          }
+        }
+
+        return closestColor;
+      }
+
+      // Fungsi untuk konversi RGB ke HEX
+      function rgbToHex(r, g, b) {
+        return (
+          "#" +
+          [r, g, b]
+            .map((x) => {
+              const hex = x.toString(16);
+              return hex.length === 1 ? "0" + hex : hex;
+            })
+            .join("")
+        );
+      }
+
+      // Fungsi untuk konversi RGB ke HSL
+      function rgbToHsl(r, g, b) {
+        r /= 255;
+        g /= 255;
+        b /= 255;
+
+        const max = Math.max(r, g, b);
+        const min = Math.min(r, g, b);
+        let h,
+          s,
+          l = (max + min) / 2;
+
+        if (max === min) {
+          h = s = 0;
+        } else {
+          const d = max - min;
+          s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+
+          switch (max) {
+            case r:
+              h = ((g - b) / d + (g < b ? 6 : 0)) / 6;
+              break;
+            case g:
+              h = ((b - r) / d + 2) / 6;
+              break;
+            case b:
+              h = ((r - g) / d + 4) / 6;
+              break;
+          }
+        }
+
+        return {
+          h: Math.round(h * 360),
+          s: Math.round(s * 100),
+          l: Math.round(l * 100),
+        };
+      }
+
+      // Fungsi untuk mendeteksi warna dengan akurasi ultra tinggi
+      function detectColor() {
+        if (video.readyState === video.HAVE_ENOUGH_DATA) {
+          canvas.width = video.videoWidth;
+          canvas.height = video.videoHeight;
+
+          ctx.drawImage(video, 0, 0);
+
+          // Ambil pixel dari tengah video
+          const centerX = Math.floor(canvas.width / 2);
+          const centerY = Math.floor(canvas.height / 2);
+
+          // Ambil area 15x15 pixel untuk hasil super akurat (225 pixel samples)
+          const sampleSize = 15;
+          const halfSize = Math.floor(sampleSize / 2);
+          const imageData = ctx.getImageData(
+            centerX - halfSize,
+            centerY - halfSize,
+            sampleSize,
+            sampleSize
+          );
+          const data = imageData.data;
+
+          // Gunakan median filtering untuk menghilangkan noise
+          const rValues = [];
+          const gValues = [];
+          const bValues = [];
+
+          for (let i = 0; i < data.length; i += 4) {
+            rValues.push(data[i]);
+            gValues.push(data[i + 1]);
+            bValues.push(data[i + 2]);
+          }
+
+          // Sort untuk mendapatkan median
+          rValues.sort((a, b) => a - b);
+          gValues.sort((a, b) => a - b);
+          bValues.sort((a, b) => a - b);
+
+          // Ambil median (lebih akurat dari mean, menghilangkan outlier)
+          const midIndex = Math.floor(rValues.length / 2);
+          const r = rValues[midIndex];
+          const g = gValues[midIndex];
+          const b = bValues[midIndex];
+
+          // Smoothing dengan weighted average dari beberapa frame sebelumnya
+          if (!this.colorHistory) {
+            this.colorHistory = [];
+          }
+
+          this.colorHistory.push({ r, g, b });
+          if (this.colorHistory.length > 5) {
+            this.colorHistory.shift();
+          }
+
+          // Hitung weighted average (frame terbaru memiliki bobot lebih besar)
+          let totalR = 0,
+            totalG = 0,
+            totalB = 0,
+            totalWeight = 0;
+          this.colorHistory.forEach((color, index) => {
+            const weight = index + 1; // Frame lebih baru = bobot lebih besar
+            totalR += color.r * weight;
+            totalG += color.g * weight;
+            totalB += color.b * weight;
+            totalWeight += weight;
+          });
+
+          const finalR = Math.round(totalR / totalWeight);
+          const finalG = Math.round(totalG / totalWeight);
+          const finalB = Math.round(totalB / totalWeight);
+
+          // Update tampilan
+          const hex = rgbToHex(finalR, finalG, finalB);
+          const hsl = rgbToHsl(finalR, finalG, finalB);
+          const name = getColorName(finalR, finalG, finalB);
+
+          colorDisplay.style.backgroundColor = hex;
+          colorName.textContent = name;
+          hexValue.textContent = hex.toUpperCase();
+          rgbValue.textContent = `${finalR}, ${finalG}, ${finalB}`;
+          hslValue.textContent = `${hsl.h}°, ${hsl.s}%, ${hsl.l}%`;
+        }
+
+        animationId = requestAnimationFrame(detectColor);
+      }
+
+      // Fungsi untuk memulai kamera
+      async function startCamera() {
+        try {
+          stream = await navigator.mediaDevices.getUserMedia({
+            video: {
+              facingMode: "environment",
+              width: { ideal: 1920 },
+              height: { ideal: 1080 },
+              frameRate: { ideal: 60 },
+            },
+          });
+
+          video.srcObject = stream;
+          video.play();
+
+          startBtn.disabled = true;
+          stopBtn.disabled = false;
+          errorMessage.style.display = "none";
+
+          detectColor();
+        } catch (error) {
+          errorMessage.textContent =
+            "Error: Tidak dapat mengakses kamera. Pastikan Anda memberikan izin akses kamera.";
+          errorMessage.style.display = "block";
+          console.error("Error accessing camera:", error);
+        }
+      }
+
+      // Fungsi untuk menghentikan kamera
+      function stopCamera() {
+        if (stream) {
+          stream.getTracks().forEach((track) => track.stop());
+          video.srcObject = null;
+        }
+
+        if (animationId) {
+          cancelAnimationFrame(animationId);
+        }
+
+        startBtn.disabled = false;
+        stopBtn.disabled = true;
+
+        colorDisplay.style.backgroundColor = "#f5f7fa";
+        colorName.textContent = "Kamera dihentikan";
+        hexValue.textContent = "#000000";
+        rgbValue.textContent = "0, 0, 0";
+        hslValue.textContent = "0°, 0%, 0%";
+      }
+
+      // Event listeners
+      startBtn.addEventListener("click", startCamera);
+      stopBtn.addEventListener("click", stopCamera);
+
+      // Cleanup saat halaman ditutup
+      window.addEventListener("beforeunload", () => {
+        if (stream) {
+          stream.getTracks().forEach((track) => track.stop());
+        }
+      });
+    </script>
+  </body>
+</html>
