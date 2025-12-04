@@ -1,533 +1,874 @@
 <!DOCTYPE html>
 <html lang="id">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Object Detection Real-Time - TensorFlow.js</title>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Object Detection Pro - TensorFlow.js</title>
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.11.0"></script>
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd@2.2.3"></script>
     <style>
-      * {
-        margin: 0;
-        padding: 0;
-        box-sizing: border-box;
-      }
-
-      body {
-        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        min-height: 100vh;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        padding: 20px;
-        color: #fff;
-      }
-
-      .header {
-        text-align: center;
-        margin-bottom: 30px;
-      }
-
-      .header h1 {
-        font-size: 2.5em;
-        margin-bottom: 10px;
-        text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
-      }
-
-      .header p {
-        font-size: 1.1em;
-        opacity: 0.9;
-      }
-
-      .container {
-        background: rgba(255, 255, 255, 0.95);
-        border-radius: 20px;
-        padding: 30px;
-        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-        max-width: 900px;
-        width: 100%;
-      }
-
-      .video-container {
-        position: relative;
-        width: 100%;
-        max-width: 640px;
-        margin: 0 auto 20px;
-        border-radius: 15px;
-        overflow: hidden;
-        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
-      }
-
-      #webcam {
-        width: 100%;
-        height: auto;
-        display: block;
-      }
-
-      #canvas {
-        position: absolute;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-      }
-
-      .controls {
-        display: flex;
-        justify-content: center;
-        gap: 15px;
-        margin-bottom: 20px;
-        flex-wrap: wrap;
-      }
-
-      button {
-        padding: 12px 30px;
-        font-size: 1em;
-        font-weight: bold;
-        border: none;
-        border-radius: 25px;
-        cursor: pointer;
-        transition: all 0.3s ease;
-        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
-      }
-
-      #startBtn {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        color: white;
-      }
-
-      #startBtn:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
-      }
-
-      #startBtn:disabled {
-        background: #ccc;
-        cursor: not-allowed;
-        transform: none;
-      }
-
-      #stopBtn {
-        background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
-        color: white;
-      }
-
-      #stopBtn:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
-      }
-
-      #stopBtn:disabled {
-        background: #ccc;
-        cursor: not-allowed;
-        transform: none;
-      }
-
-      .status {
-        text-align: center;
-        padding: 15px;
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        color: white;
-        border-radius: 10px;
-        margin-bottom: 20px;
-        font-weight: bold;
-        min-height: 50px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-      }
-
-      .stats {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-        gap: 15px;
-        margin-top: 20px;
-      }
-
-      .stat-card {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        color: white;
-        padding: 20px;
-        border-radius: 10px;
-        text-align: center;
-        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
-      }
-
-      .stat-card h3 {
-        font-size: 0.9em;
-        margin-bottom: 10px;
-        opacity: 0.9;
-      }
-
-      .stat-card .value {
-        font-size: 2em;
-        font-weight: bold;
-      }
-
-      .detection-list {
-        max-height: 200px;
-        overflow-y: auto;
-        background: #f8f9fa;
-        border-radius: 10px;
-        padding: 15px;
-        margin-top: 20px;
-      }
-
-      .detection-item {
-        background: white;
-        padding: 10px;
-        margin-bottom: 10px;
-        border-radius: 8px;
-        border-left: 4px solid #667eea;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
-      }
-
-      .detection-item:last-child {
-        margin-bottom: 0;
-      }
-
-      .detection-label {
-        font-weight: bold;
-        color: #667eea;
-        text-transform: capitalize;
-      }
-
-      .detection-confidence {
-        background: #667eea;
-        color: white;
-        padding: 4px 12px;
-        border-radius: 15px;
-        font-size: 0.9em;
-      }
-
-      .loader {
-        border: 4px solid #f3f3f3;
-        border-top: 4px solid #667eea;
-        border-radius: 50%;
-        width: 40px;
-        height: 40px;
-        animation: spin 1s linear infinite;
-        margin: 0 auto;
-      }
-
-      @keyframes spin {
-        0% {
-          transform: rotate(0deg);
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
         }
-        100% {
-          transform: rotate(360deg);
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+            color: #fff;
         }
-      }
 
-      .footer {
-        margin-top: 20px;
-        text-align: center;
-        opacity: 0.8;
-        font-size: 0.9em;
-      }
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
 
-      @media (max-width: 768px) {
         .header h1 {
-          font-size: 1.8em;
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .header p {
+            font-size: 1.1em;
+            opacity: 0.9;
         }
 
         .container {
-          padding: 20px;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            max-width: 1000px;
+            width: 100%;
+        }
+
+        .video-container {
+            position: relative;
+            width: 100%;
+            max-width: 640px;
+            margin: 0 auto 20px;
+            border-radius: 15px;
+            overflow: hidden;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+
+        #webcam {
+            width: 100%;
+            height: auto;
+            display: block;
+        }
+
+        #canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+        }
+
+        .settings-panel {
+            background: #f8f9fa;
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 20px;
+            color: #333;
+        }
+
+        .settings-panel h3 {
+            margin-bottom: 15px;
+            color: #667eea;
+            font-size: 1.2em;
+        }
+
+        .setting-group {
+            margin-bottom: 15px;
+        }
+
+        .setting-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: bold;
+            color: #555;
+        }
+
+        .slider-container {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .slider-container input[type="range"] {
+            flex: 1;
+            height: 8px;
+            border-radius: 5px;
+            background: #ddd;
+            outline: none;
+            -webkit-appearance: none;
+        }
+
+        .slider-container input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: #667eea;
+            cursor: pointer;
+        }
+
+        .slider-container input[type="range"]::-moz-range-thumb {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: #667eea;
+            cursor: pointer;
+            border: none;
+        }
+
+        .slider-value {
+            min-width: 60px;
+            text-align: center;
+            font-weight: bold;
+            color: #667eea;
+            background: white;
+            padding: 5px 10px;
+            border-radius: 8px;
+        }
+
+        .model-selector {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .model-option {
+            flex: 1;
+            min-width: 150px;
+            padding: 12px;
+            background: white;
+            border: 2px solid #ddd;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-align: center;
+        }
+
+        .model-option:hover {
+            border-color: #667eea;
+            transform: translateY(-2px);
+        }
+
+        .model-option.active {
+            border-color: #667eea;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .model-option .model-name {
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+
+        .model-option .model-desc {
+            font-size: 0.85em;
+            opacity: 0.8;
+        }
+
+        .controls {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
         }
 
         button {
-          padding: 10px 20px;
-          font-size: 0.9em;
+            padding: 12px 30px;
+            font-size: 1em;
+            font-weight: bold;
+            border: none;
+            border-radius: 25px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
         }
-      }
+
+        #startBtn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        #startBtn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0,0,0,0.3);
+        }
+
+        #startBtn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        #stopBtn {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            color: white;
+        }
+
+        #stopBtn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0,0,0,0.3);
+        }
+
+        #stopBtn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .status {
+            text-align: center;
+            padding: 15px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            font-weight: bold;
+            min-height: 50px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+        }
+
+        .stat-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+
+        .stat-card h3 {
+            font-size: 0.9em;
+            margin-bottom: 10px;
+            opacity: 0.9;
+        }
+
+        .stat-card .value {
+            font-size: 2em;
+            font-weight: bold;
+        }
+
+        .detection-list {
+            max-height: 200px;
+            overflow-y: auto;
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 15px;
+            margin-top: 20px;
+        }
+
+        .detection-item {
+            background: white;
+            padding: 12px;
+            margin-bottom: 10px;
+            border-radius: 8px;
+            border-left: 4px solid #667eea;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+
+        .detection-item:last-child {
+            margin-bottom: 0;
+        }
+
+        .detection-label {
+            font-weight: bold;
+            color: #667eea;
+            text-transform: capitalize;
+        }
+
+        .detection-confidence {
+            background: #667eea;
+            color: white;
+            padding: 4px 12px;
+            border-radius: 15px;
+            font-size: 0.9em;
+        }
+
+        .detection-confidence.high {
+            background: #10b981;
+        }
+
+        .detection-confidence.medium {
+            background: #f59e0b;
+        }
+
+        .detection-confidence.low {
+            background: #ef4444;
+        }
+
+        .loader {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .info-box {
+            background: #e0e7ff;
+            border-left: 4px solid #667eea;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 20px;
+            color: #333;
+        }
+
+        .info-box h4 {
+            color: #667eea;
+            margin-bottom: 10px;
+        }
+
+        .info-box ul {
+            margin-left: 20px;
+            line-height: 1.6;
+        }
+
+        .footer {
+            margin-top: 20px;
+            text-align: center;
+            opacity: 0.8;
+            font-size: 0.9em;
+        }
+
+        @media (max-width: 768px) {
+            .header h1 {
+                font-size: 1.8em;
+            }
+            
+            .container {
+                padding: 20px;
+            }
+            
+            button {
+                padding: 10px 20px;
+                font-size: 0.9em;
+            }
+
+            .model-option {
+                min-width: 100%;
+            }
+        }
     </style>
-  </head>
-  <body>
+</head>
+<body>
     <div class="header">
-      <h1>🎯 Object Detection Real-Time</h1>
-      <p>Deteksi objek menggunakan TensorFlow.js & COCO-SSD</p>
+        <h1>🎯 Object Detection Pro</h1>
+        <p>AI-Powered Real-Time Detection dengan Akurasi Tinggi</p>
     </div>
 
     <div class="container">
-      <div class="status" id="status">
-        <div class="loader"></div>
-        <span style="margin-left: 15px">Memuat model TensorFlow.js...</span>
-      </div>
-
-      <div class="controls">
-        <button id="startBtn" disabled>▶ Mulai Deteksi</button>
-        <button id="stopBtn" disabled>⏸ Berhenti</button>
-      </div>
-
-      <div class="video-container">
-        <video id="webcam" autoplay playsinline></video>
-        <canvas id="canvas"></canvas>
-      </div>
-
-      <div class="stats">
-        <div class="stat-card">
-          <h3>Objek Terdeteksi</h3>
-          <div class="value" id="objectCount">0</div>
+        <div class="status" id="status">
+            <div class="loader"></div>
+            <span style="margin-left: 15px;">Memuat model TensorFlow.js...</span>
         </div>
-        <div class="stat-card">
-          <h3>FPS</h3>
-          <div class="value" id="fps">0</div>
-        </div>
-        <div class="stat-card">
-          <h3>Waktu Proses (ms)</h3>
-          <div class="value" id="processTime">0</div>
-        </div>
-      </div>
 
-      <div class="detection-list" id="detectionList">
-        <p style="text-align: center; color: #999">
-          Belum ada objek terdeteksi
-        </p>
-      </div>
+        <div class="settings-panel">
+            <h3>⚙️ Pengaturan Deteksi</h3>
+            
+            <div class="setting-group">
+                <label>Model COCO-SSD:</label>
+                <div class="model-selector">
+                    <div class="model-option active" data-model="lite_mobilenet_v2">
+                        <div class="model-name">Lite (Cepat)</div>
+                        <div class="model-desc">Mobilenet V2 - Ringan & responsif</div>
+                    </div>
+                    <div class="model-option" data-model="mobilenet_v2">
+                        <div class="model-name">Standard (Seimbang)</div>
+                        <div class="model-desc">Mobilenet V2 - Balance speed & akurasi</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="setting-group">
+                <label>Confidence Threshold (Tingkat Keyakinan Minimum):</label>
+                <div class="slider-container">
+                    <input type="range" id="confidenceSlider" min="0.3" max="0.9" step="0.05" value="0.6">
+                    <span class="slider-value" id="confidenceValue">60%</span>
+                </div>
+                <small style="color: #666; display: block; margin-top: 5px;">
+                    Semakin tinggi = lebih akurat tapi objek lebih sedikit terdeteksi
+                </small>
+            </div>
+
+            <div class="setting-group">
+                <label>Max Detections (Jumlah Objek Maksimal):</label>
+                <div class="slider-container">
+                    <input type="range" id="maxDetectionsSlider" min="5" max="50" step="5" value="20">
+                    <span class="slider-value" id="maxDetectionsValue">20</span>
+                </div>
+            </div>
+
+            <div class="setting-group">
+                <label>IOU Threshold (Non-Maximum Suppression):</label>
+                <div class="slider-container">
+                    <input type="range" id="iouSlider" min="0.3" max="0.7" step="0.05" value="0.5">
+                    <span class="slider-value" id="iouValue">0.50</span>
+                </div>
+                <small style="color: #666; display: block; margin-top: 5px;">
+                    Menghilangkan deteksi duplikat pada objek yang sama
+                </small>
+            </div>
+        </div>
+
+        <div class="controls">
+            <button id="startBtn" disabled>▶ Mulai Deteksi</button>
+            <button id="stopBtn" disabled>⏸ Berhenti</button>
+        </div>
+
+        <div class="video-container">
+            <video id="webcam" autoplay playsinline></video>
+            <canvas id="canvas"></canvas>
+        </div>
+
+        <div class="stats">
+            <div class="stat-card">
+                <h3>Objek Terdeteksi</h3>
+                <div class="value" id="objectCount">0</div>
+            </div>
+            <div class="stat-card">
+                <h3>FPS</h3>
+                <div class="value" id="fps">0</div>
+            </div>
+            <div class="stat-card">
+                <h3>Waktu Proses</h3>
+                <div class="value" id="processTime">0ms</div>
+            </div>
+            <div class="stat-card">
+                <h3>Avg Confidence</h3>
+                <div class="value" id="avgConfidence">0%</div>
+            </div>
+        </div>
+
+        <div class="detection-list" id="detectionList">
+            <p style="text-align: center; color: #999;">Belum ada objek terdeteksi</p>
+        </div>
+
+        <div class="info-box">
+            <h4>💡 Tips untuk Deteksi yang Lebih Akurat:</h4>
+            <ul>
+                <li><strong>Pencahayaan:</strong> Pastikan ruangan cukup terang dan hindari backlight</li>
+                <li><strong>Jarak:</strong> Objek tidak terlalu dekat atau jauh dari kamera (30-150cm ideal)</li>
+                <li><strong>Fokus:</strong> Objek berada di tengah frame dan tidak blur</li>
+                <li><strong>Confidence:</strong> Naikkan threshold ke 70-80% untuk hasil lebih akurat</li>
+                <li><strong>Background:</strong> Background yang kontras membantu deteksi lebih baik</li>
+            </ul>
+        </div>
     </div>
 
     <div class="footer">
-      <p>Powered by TensorFlow.js COCO-SSD Model</p>
+        <p>Powered by TensorFlow.js COCO-SSD | 80+ Kategori Objek</p>
     </div>
 
     <script>
-      let model = null;
-      let webcam = null;
-      let canvas = null;
-      let ctx = null;
-      let isDetecting = false;
-      let animationId = null;
-      let lastFrameTime = Date.now();
-      let frameCount = 0;
-      let fpsInterval = null;
+        let model = null;
+        let webcam = null;
+        let canvas = null;
+        let ctx = null;
+        let isDetecting = false;
+        let animationId = null;
+        let frameCount = 0;
+        let fpsInterval = null;
+        let selectedModel = 'lite_mobilenet_v2';
 
-      const startBtn = document.getElementById("startBtn");
-      const stopBtn = document.getElementById("stopBtn");
-      const status = document.getElementById("status");
-      const objectCountEl = document.getElementById("objectCount");
-      const fpsEl = document.getElementById("fps");
-      const processTimeEl = document.getElementById("processTime");
-      const detectionListEl = document.getElementById("detectionList");
+        // Settings
+        let settings = {
+            scoreThreshold: 0.6,
+            maxDetections: 20,
+            iouThreshold: 0.5
+        };
 
-      // Inisialisasi
-      async function init() {
-        try {
-          updateStatus("Memuat model COCO-SSD...");
-          model = await cocoSsd.load();
+        const startBtn = document.getElementById('startBtn');
+        const stopBtn = document.getElementById('stopBtn');
+        const status = document.getElementById('status');
+        const objectCountEl = document.getElementById('objectCount');
+        const fpsEl = document.getElementById('fps');
+        const processTimeEl = document.getElementById('processTime');
+        const avgConfidenceEl = document.getElementById('avgConfidence');
+        const detectionListEl = document.getElementById('detectionList');
+        
+        const confidenceSlider = document.getElementById('confidenceSlider');
+        const confidenceValue = document.getElementById('confidenceValue');
+        const maxDetectionsSlider = document.getElementById('maxDetectionsSlider');
+        const maxDetectionsValue = document.getElementById('maxDetectionsValue');
+        const iouSlider = document.getElementById('iouSlider');
+        const iouValue = document.getElementById('iouValue');
 
-          webcam = document.getElementById("webcam");
-          canvas = document.getElementById("canvas");
-          ctx = canvas.getContext("2d");
+        // Event listeners for settings
+        confidenceSlider.addEventListener('input', (e) => {
+            settings.scoreThreshold = parseFloat(e.target.value);
+            confidenceValue.textContent = Math.round(settings.scoreThreshold * 100) + '%';
+        });
 
-          updateStatus(
-            'Model siap! Klik tombol "Mulai Deteksi" untuk memulai.'
-          );
-          startBtn.disabled = false;
-        } catch (error) {
-          updateStatus("Error: " + error.message);
-          console.error("Error loading model:", error);
-        }
-      }
+        maxDetectionsSlider.addEventListener('input', (e) => {
+            settings.maxDetections = parseInt(e.target.value);
+            maxDetectionsValue.textContent = settings.maxDetections;
+        });
 
-      // Update status
-      function updateStatus(message) {
-        status.innerHTML = message;
-      }
+        iouSlider.addEventListener('input', (e) => {
+            settings.iouThreshold = parseFloat(e.target.value);
+            iouValue.textContent = settings.iouThreshold.toFixed(2);
+        });
 
-      // Mulai webcam
-      async function startWebcam() {
-        try {
-          const stream = await navigator.mediaDevices.getUserMedia({
-            video: {
-              width: { ideal: 640 },
-              height: { ideal: 480 },
-            },
-          });
-          webcam.srcObject = stream;
+        // Model selector
+        document.querySelectorAll('.model-option').forEach(option => {
+            option.addEventListener('click', async function() {
+                if (isDetecting) {
+                    alert('Hentikan deteksi terlebih dahulu sebelum mengganti model!');
+                    return;
+                }
 
-          return new Promise((resolve) => {
-            webcam.onloadedmetadata = () => {
-              canvas.width = webcam.videoWidth;
-              canvas.height = webcam.videoHeight;
-              resolve();
-            };
-          });
-        } catch (error) {
-          updateStatus("Error mengakses webcam: " + error.message);
-          throw error;
-        }
-      }
+                document.querySelectorAll('.model-option').forEach(opt => opt.classList.remove('active'));
+                this.classList.add('active');
+                selectedModel = this.dataset.model;
+                
+                // Reload model
+                updateStatus('Memuat ulang model...');
+                startBtn.disabled = true;
+                await loadModel();
+            });
+        });
 
-      // Stop webcam
-      function stopWebcam() {
-        if (webcam && webcam.srcObject) {
-          webcam.srcObject.getTracks().forEach((track) => track.stop());
-          webcam.srcObject = null;
-        }
-      }
-
-      // Gambar bounding box
-      function drawBoundingBox(prediction) {
-        const [x, y, width, height] = prediction.bbox;
-
-        // Gambar box
-        ctx.strokeStyle = "#00FF00";
-        ctx.lineWidth = 3;
-        ctx.strokeRect(x, y, width, height);
-
-        // Background untuk label
-        const label = `${prediction.class} ${Math.round(
-          prediction.score * 100
-        )}%`;
-        ctx.font = "bold 16px Arial";
-        const textWidth = ctx.measureText(label).width;
-
-        ctx.fillStyle = "#00FF00";
-        ctx.fillRect(x, y - 25, textWidth + 10, 25);
-
-        // Text label
-        ctx.fillStyle = "#000000";
-        ctx.fillText(label, x + 5, y - 7);
-      }
-
-      // Update daftar deteksi
-      function updateDetectionList(predictions) {
-        if (predictions.length === 0) {
-          detectionListEl.innerHTML =
-            '<p style="text-align: center; color: #999;">Belum ada objek terdeteksi</p>';
-          return;
+        // Load model
+        async function loadModel() {
+            try {
+                const modelConfig = {
+                    base: selectedModel
+                };
+                
+                model = await cocoSsd.load(modelConfig);
+                updateStatus('Model siap! Klik tombol "Mulai Deteksi" untuk memulai.');
+                startBtn.disabled = false;
+            } catch (error) {
+                updateStatus('Error loading model: ' + error.message);
+                console.error('Error loading model:', error);
+            }
         }
 
-        detectionListEl.innerHTML = predictions
-          .map(
-            (pred) => `
-                <div class="detection-item">
-                    <span class="detection-label">${pred.class}</span>
-                    <span class="detection-confidence">${Math.round(
-                      pred.score * 100
-                    )}%</span>
-                </div>
-            `
-          )
-          .join("");
-      }
-
-      // Deteksi objek
-      async function detectObjects() {
-        if (!isDetecting) return;
-
-        const startTime = performance.now();
-
-        try {
-          const predictions = await model.detect(webcam);
-
-          // Clear canvas
-          ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-          // Gambar setiap deteksi
-          predictions.forEach((prediction) => {
-            drawBoundingBox(prediction);
-          });
-
-          // Update stats
-          objectCountEl.textContent = predictions.length;
-          const processTime = Math.round(performance.now() - startTime);
-          processTimeEl.textContent = processTime;
-
-          // Update detection list
-          updateDetectionList(predictions);
-
-          // Calculate FPS
-          frameCount++;
-        } catch (error) {
-          console.error("Error during detection:", error);
+        // Inisialisasi
+        async function init() {
+            try {
+                updateStatus('Memuat model COCO-SSD...');
+                await loadModel();
+                
+                webcam = document.getElementById('webcam');
+                canvas = document.getElementById('canvas');
+                ctx = canvas.getContext('2d');
+            } catch (error) {
+                updateStatus('Error: ' + error.message);
+                console.error('Error during init:', error);
+            }
         }
 
-        animationId = requestAnimationFrame(detectObjects);
-      }
-
-      // Update FPS
-      function updateFPS() {
-        fpsEl.textContent = frameCount;
-        frameCount = 0;
-      }
-
-      // Mulai deteksi
-      async function startDetection() {
-        try {
-          startBtn.disabled = true;
-          updateStatus("Memulai webcam...");
-
-          await startWebcam();
-
-          isDetecting = true;
-          startBtn.disabled = true;
-          stopBtn.disabled = false;
-
-          updateStatus("🟢 Deteksi aktif - webcam berjalan");
-
-          // Start FPS counter
-          fpsInterval = setInterval(updateFPS, 1000);
-
-          detectObjects();
-        } catch (error) {
-          startBtn.disabled = false;
-          console.error("Error starting detection:", error);
-        }
-      }
-
-      // Stop deteksi
-      function stopDetection() {
-        isDetecting = false;
-
-        if (animationId) {
-          cancelAnimationFrame(animationId);
-          animationId = null;
+        // Update status
+        function updateStatus(message) {
+            status.innerHTML = message;
         }
 
-        if (fpsInterval) {
-          clearInterval(fpsInterval);
-          fpsInterval = null;
+        // Mulai webcam
+        async function startWebcam() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    video: { 
+                        width: { ideal: 1280 },
+                        height: { ideal: 720 },
+                        facingMode: 'environment'
+                    }
+                });
+                webcam.srcObject = stream;
+                
+                return new Promise((resolve) => {
+                    webcam.onloadedmetadata = () => {
+                        canvas.width = webcam.videoWidth;
+                        canvas.height = webcam.videoHeight;
+                        resolve();
+                    };
+                });
+            } catch (error) {
+                updateStatus('Error mengakses webcam: ' + error.message);
+                throw error;
+            }
         }
 
-        stopWebcam();
-
-        // Clear canvas
-        if (ctx) {
-          ctx.clearRect(0, 0, canvas.width, canvas.height);
+        // Stop webcam
+        function stopWebcam() {
+            if (webcam && webcam.srcObject) {
+                webcam.srcObject.getTracks().forEach(track => track.stop());
+                webcam.srcObject = null;
+            }
         }
 
-        startBtn.disabled = false;
-        stopBtn.disabled = true;
-
-        updateStatus(
-          '⏸ Deteksi dihentikan. Klik "Mulai Deteksi" untuk memulai lagi.'
-        );
-
-        // Reset stats
-        objectCountEl.textContent = "0";
-        fpsEl.textContent = "0";
-        processTimeEl.textContent = "0";
-        frameCount = 0;
-      }
-
-      // Event listeners
-      startBtn.addEventListener("click", startDetection);
-      stopBtn.addEventListener("click", stopDetection);
-
-      // Inisialisasi saat halaman dimuat
-      window.addEventListener("load", init);
-
-      // Cleanup saat halaman ditutup
-      window.addEventListener("beforeunload", () => {
-        if (isDetecting) {
-          stopDetection();
+        // Gambar bounding box dengan styling berbeda berdasarkan confidence
+        function drawBoundingBox(prediction) {
+            const [x, y, width, height] = prediction.bbox;
+            const confidence = prediction.score;
+            
+            // Warna berdasarkan confidence
+            let color;
+            if (confidence >= 0.8) {
+                color = '#10b981'; // Green
+            } else if (confidence >= 0.6) {
+                color = '#f59e0b'; // Orange
+            } else {
+                color = '#ef4444'; // Red
+            }
+            
+            // Gambar box dengan shadow
+            ctx.shadowColor = 'rgba(0, 0, 0, 0.5)';
+            ctx.shadowBlur = 10;
+            ctx.strokeStyle = color;
+            ctx.lineWidth = 4;
+            ctx.strokeRect(x, y, width, height);
+            ctx.shadowBlur = 0;
+            
+            // Background untuk label
+            const label = `${prediction.class} ${Math.round(prediction.score * 100)}%`;
+            ctx.font = 'bold 18px Arial';
+            const textWidth = ctx.measureText(label).width;
+            
+            // Gradient background
+            const gradient = ctx.createLinearGradient(x, y - 30, x + textWidth + 20, y);
+            gradient.addColorStop(0, color);
+            gradient.addColorStop(1, color + 'dd');
+            
+            ctx.fillStyle = gradient;
+            ctx.fillRect(x, y - 30, textWidth + 20, 30);
+            
+            // Text label
+            ctx.fillStyle = '#FFFFFF';
+            ctx.fillText(label, x + 10, y - 8);
         }
-      });
+
+        // Update daftar deteksi dengan color coding
+        function updateDetectionList(predictions) {
+            if (predictions.length === 0) {
+                detectionListEl.innerHTML = '<p style="text-align: center; color: #999;">Belum ada objek terdeteksi</p>';
+                return;
+            }
+
+            // Sort by confidence
+            const sortedPredictions = [...predictions].sort((a, b) => b.score - a.score);
+
+            detectionListEl.innerHTML = sortedPredictions.map(pred => {
+                const confidence = Math.round(pred.score * 100);
+                let confidenceClass = 'low';
+                if (confidence >= 80) confidenceClass = 'high';
+                else if (confidence >= 60) confidenceClass = 'medium';
+
+                return `
+                    <div class="detection-item">
+                        <span class="detection-label">${pred.class}</span>
+                        <span class="detection-confidence ${confidenceClass}">${confidence}%</span>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // Deteksi objek dengan pengaturan advanced
+        async function detectObjects() {
+            if (!isDetecting) return;
+
+            const startTime = performance.now();
+
+            try {
+                // Detect dengan parameter yang bisa dikustomisasi
+                const predictions = await model.detect(webcam, 
+                    settings.maxDetections,
+                    settings.scoreThreshold
+                );
+                
+                // Filter berdasarkan IOU threshold untuk menghilangkan duplikasi
+                const filteredPredictions = filterByIOU(predictions, settings.iouThreshold);
+                
+                // Clear canvas
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                
+                // Gambar setiap deteksi
+                filteredPredictions.forEach(prediction => {
+                    drawBoundingBox(prediction);
+                });
+
+                // Calculate average confidence
+                const avgConf = filteredPredictions.length > 0 
+                    ? filteredPredictions.reduce((sum, p) => sum + p.score, 0) / filteredPredictions.length
+                    : 0;
+
+                // Update stats
+                objectCountEl.textContent = filteredPredictions.length;
+                const processTime = Math.round(performance.now() - startTime);
+                processTimeEl.textContent = processTime + 'ms';
+                avgConfidenceEl.textContent = Math.round(avgConf * 100) + '%';
+                
+                // Update detection list
+                updateDetectionList(filteredPredictions);
+
+                frameCount++;
+                
+            } catch (error) {
+                console.error('Error during detection:', error);
+            }
+
+            animationId = requestAnimationFrame(detectObjects);
+        }
+
+        // Filter predictions by IOU to remove duplicates
+        function filterByIOU(predictions, iouThreshold) {
+            const filtered = [];
+            const sorted = [...predictions].sort((a, b) => b.score - a.score);
+
+            for (let i = 0; i < sorted.length; i++) {
+                let keep = true;
+                for (let j = 0; j < filtered.length; j++) {
+                    if (calculateIOU(sorted[i].bbox, filtered[j].bbox) > iouThreshold) {
+                        keep = false;
+                        break;
+                    }
+                }
+                if (keep) {
+                    filtered.push(sorted[i]);
+                }
+            }
+
+            return filtered;
+        }
+
+        // Calculate Intersection over Union
+        function calculateIOU(box1, box2) {
+            const [x1, y1, w1, h1] = box1;
+            const [x2, y2, w2, h2] = box2;
+
+            const xLeft = Math.max(x1, x2);
+            const yTop = Math.max(y1, y2);
+            const xRight = Math.min(x1 + w1, x2 + w2);
+            const yBottom = Math.min(y1 + h1, y2 + h2);
+
+            if (xRight < xLeft || yBottom < yTop) return 0.0;
+
+            const intersectionArea = (xRight - xLeft) * (yBottom - yTop);
+            const box1Area = w1 * h1;
+            const box2Area = w2 * h2;
+            const unionArea = box1Area + box2Area - intersectionArea;
+
+            return intersectionArea / unionArea;
+        }
+
+        // Update FPS
+        function updateFPS() {
+            fpsEl.textContent = frameCount;
+            frameCount = 0;
+        }
+
+        // Mulai deteksi
+        async function startDetection() {
+            try {
+                startBtn.disabled = true;
+                updateStatus('Memulai webcam...');
+                
+                await startWebcam();
+                
+                isDetecting = true;
+                startBtn.disabled = true;
+                stopBtn.disabled = false;
+                
+                // Disable settings during detection
+                document.querySelectorAll('.model-option').forEach(opt => opt.style.pointerEvents = 'none');
+                
+                updateStatus('🟢 Deteksi aktif - webcam berjalan');
+                
+                // Start FPS counter
+                fpsInterval = setInterval(updateFPS, 1000);
+                
+                detectObjects();
+            } catch (error) {
+                startBtn.disabled = false;
+                console.error('Error starting detection:', error);
+            }
+        }
+
+        // Stop deteksi
+        function stopDetection() {
+            isDetecting = false;
+            
+            if (animationId) {
+                cancelAnimationFrame(animationId);
+                animationId = null;
+            }
+            
+            if (fpsInterval) {
+                clearInterval(fpsInterval);
+                fpsInterval = null;
+            }
+            
+            stopWebcam();
+            
+            // Clear canvas
+            if (ctx) {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+            }
+            
+            // Enable settings
+            document.querySelectorAll('.model-option').forEach(opt => opt.style.pointerEvents = 'auto');
+            
+            startBtn.disabled = false;
+            stopBtn.disabled = true;
+            
+            updateStatus('⏸ Deteksi dihentikan. Klik "Mulai Deteksi" untuk memulai lagi.');
+            
+            // Reset stats
+            objectCountEl.textContent = '0';
+            fpsEl.textContent = '0';
+            processTimeEl.textContent = '0ms';
+            avgConfidenceEl.textContent = '0%';
+            frameCount = 0;
+        }
+
+        // Event listeners
+        startBtn.addEventListener('click', startDetection);
+        stopBtn.addEventListener('click', stopDetection);
+
+        // Inisialisasi saat halaman dimuat
+        window.addEventListener('load', init);
+
+        // Cleanup saat halaman ditutup
+        window.addEventListener('beforeunload', () => {
+            if (isDetecting) {
+                stopDetection();
+            }
+        });
     </script>
-  </body>
+</body>
 </html>
